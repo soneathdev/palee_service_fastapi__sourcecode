@@ -41,6 +41,7 @@ def export_assessment_results_report(
     subject_id: Optional[str] = Query(None, description="ລະຫັດວິຊາ (optional)"),
     level_id: Optional[str] = Query(None, description="ລະຫັດລະດັບ (optional)"),
     ranking: Optional[int] = Query(None, description="ອັນດັບ 1, 2, 3 (optional)"),
+    search: Optional[str] = Query(None, description="ຄຳຄົ້ນຫາ: ຊື່ ຫຼື ລະຫັດນັກຮຽນ ແລະ ອື່ນໆ (optional)"),
     format: str = Query("excel", description="ຮູບແບບໄຟລ໌: csv ຫຼື excel"),
     db: Session = Depends(get_db),
 ):
@@ -51,6 +52,7 @@ def export_assessment_results_report(
         subject_id=subject_id,
         level_id=level_id,
         ranking=ranking,
+        search=search,
         format=format,
     )
     return success_response(result, "Export ລາຍງານຜົນການຮຽນສຳເລັດ")
@@ -63,6 +65,7 @@ def assessment_results_report_pdf(
     subject_id: Optional[str] = Query(None, description="ລະຫັດວິຊາ (optional)"),
     level_id: Optional[str] = Query(None, description="ລະຫັດລະດັບ (optional)"),
     ranking: Optional[int] = Query(None, description="ອັນດັບ 1, 2, 3 (optional)"),
+    search: Optional[str] = Query(None, description="ຄຳຄົ້ນຫາ: ຊື່ ຫຼື ລະຫັດນັກຮຽນ ແລະ ອື່ນໆ (optional)"),
     db: Session = Depends(get_db),
 ):
     report_data = svc.get_assessment_report_data(
@@ -72,6 +75,7 @@ def assessment_results_report_pdf(
         subject_id=subject_id,
         level_id=level_id,
         ranking=ranking,
+        search=search,
     )
     pdf_bytes = receipt_pdf_svc.build_assessment_report_pdf(report_data)
     return Response(

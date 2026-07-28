@@ -32,6 +32,32 @@ def _round_label(semester: str) -> str:
     return semester
 
 
+def _search_values(item) -> list[str]:
+    # ຄ່າທີ່ໃຊ້ຄົ້ນຫາ ຕ້ອງກົງກັບ searchKeys ຂອງຕາຕະລາງໜ້າຈໍ ເພື່ອໃຫ້ຜົນຄືກັນ.
+    return [
+        item.full_name,
+        item.student_id,
+        item.province_name or "-",
+        item.district_name or "-",
+        item.subject_name,
+        item.level_name,
+        _round_label(item.semester),
+        str(item.ranking),
+    ]
+
+
+def _apply_search(items: list, search: Optional[str]) -> list:
+    # ບໍ່ຕັດຊ່ອງຫວ່າງ ເພື່ອໃຫ້ກົງກັບການຄົ້ນຫາຢູ່ໜ້າຈໍທຸກປະການ.
+    query = (search or "").lower()
+    if not query:
+        return items
+    return [
+        item
+        for item in items
+        if any(query in str(value or "").lower() for value in _search_values(item))
+    ]
+
+
 def get_assessment_report_data(
     db: Session,
     *,
@@ -40,6 +66,7 @@ def get_assessment_report_data(
     subject_id: Optional[str] = None,
     level_id: Optional[str] = None,
     ranking: Optional[int] = None,
+    search: Optional[str] = None,
 ) -> Dict[str, Any]:
     items = evaluation_svc.get_assessment_report(
         db,
@@ -54,6 +81,7 @@ def get_assessment_report_data(
         items,
         key=lambda it: it.ranking if it.ranking is not None else float("inf"),
     )
+    items = _apply_search(items, search)
 
     resolved_academic_id = academic_id
     if items:
@@ -70,6 +98,7 @@ def get_assessment_report_data(
             "level_id": level_id,
             "level_name": items[0].level_name if level_id and items else None,
             "ranking": ranking,
+            "search": search or None,
         },
         "total_count": len(items),
         "items": [item.model_dump() for item in items],
@@ -84,6 +113,7 @@ def export_assessment_report(
     subject_id: Optional[str] = None,
     level_id: Optional[str] = None,
     ranking: Optional[int] = None,
+    search: Optional[str] = None,
     format: str = "excel",
 ) -> Dict[str, Any]:
     report_data = get_assessment_report_data(
@@ -93,6 +123,7 @@ def export_assessment_report(
         subject_id=subject_id,
         level_id=level_id,
         ranking=ranking,
+        search=search,
     )
     items = report_data["items"]
     normalized_format = format.lower()
@@ -149,22 +180,28 @@ def export_assessment_report(
     )
 
     filters = report_data["filters"]
+    info_rows = [
+        ("ວັນທີສ້າງ", format_report_datetime()),
+        ("ສົກຮຽນ", filters.get("academic_year_name") or "ປັດຈຸບັນ"),
+        ("ຮອບປະເມີນ", filters.get("evaluation_round_name") or "-"),
+        ("ວິຊາ", filters.get("subject_name") or "ທັງໝົດ"),
+        ("ລະດັບ", filters.get("level_name") or "ທັງໝົດ"),
+        ("ອັນດັບ", filters.get("ranking") or "ທັງໝົດ"),
+    ]
+    if filters.get("search"):
+        info_rows.append(("ຄົ້ນຫາ", filters["search"]))
+    info_rows.append(("ຈຳນວນລາຍການ", report_data["total_count"]))
+
+    info_start_row = 3
     write_excel_key_value_rows(
         sheet,
-        rows=[
-            ("ວັນທີສ້າງ", format_report_datetime()),
-            ("ສົກຮຽນ", filters.get("academic_year_name") or "ປັດຈຸບັນ"),
-            ("ຮອບປະເມີນ", filters.get("evaluation_round_name") or "-"),
-            ("ວິຊາ", filters.get("subject_name") or "ທັງໝົດ"),
-            ("ລະດັບ", filters.get("level_name") or "ທັງໝົດ"),
-            ("ອັນດັບ", filters.get("ranking") or "ທັງໝົດ"),
-            ("ຈຳນວນລາຍການ", report_data["total_count"]),
-        ],
-        start_row=3,
+        rows=info_rows,
+        start_row=info_start_row,
         theme=theme,
     )
 
-    header_row = 11
+    # ເລີ່ມຕາຕະລາງຫຼັງແຖວຂໍ້ມູນ ໂດຍເວັ້ນ 1 ແຖວ.
+    header_row = info_start_row + len(info_rows) + 1
     write_excel_table_headers(sheet, headers=headers, row_index=header_row, theme=theme)
     write_excel_table_rows(
         sheet,

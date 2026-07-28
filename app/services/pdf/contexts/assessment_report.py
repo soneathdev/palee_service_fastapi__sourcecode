@@ -25,6 +25,7 @@ def build_assessment_report_context(
     add_filter("ວິຊາ", filters.get("subject_name"))
     add_filter("ລະດັບ", filters.get("level_name"))
     add_filter("ອັນດັບ", filters.get("ranking"))
+    add_filter("ຄົ້ນຫາ", filters.get("search"))
 
     rank_one = sum(1 for item in items if item.get("ranking") == 1)
     rank_two = sum(1 for item in items if item.get("ranking") == 2)
